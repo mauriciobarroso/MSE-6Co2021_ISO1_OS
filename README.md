@@ -7,7 +7,7 @@ TP para la materia Implementación de Sistemas Operativos I de la Maestría en S
 entendiéndose por este término que la totalidad de memoria asociada a cada tarea y al
 kernel será definida en tiempo de compilación.
 2. [x] La cantidad de tareas que soportara el OS será ocho (8).
-3. [] El OS debe administrar las IRQ del hardware.
+3. [ ] El OS debe administrar las IRQ del hardware.
 4. El kernel debe poseer una estructura de control la cual contenga como mínimo los
 siguientes campos:
 - [x] Último error ocurrido.
@@ -29,7 +29,7 @@ siguientes campos:
 - [x] Corriendo (Running).
 - [x] Lista para ejecución (Ready).
 - [x] Bloqueada (Blocked).
-- [] Suspendida (Suspended) - Opcional
+- [ ] Suspendida (Suspended) - Opcional
 7. [x] El tamaño de stack para cada tarea será de 256 bytes.
 8. [x] La implementación de prioridades será de 4 niveles, donde el nivel cero (0) será el de más alta prioridad y tres (3) será el nivel de menor prioridad.
 9. [x] La política de scheduling entre tareas de la misma prioridad será del tipo Round-Robin.
@@ -41,7 +41,7 @@ siguientes campos:
 - [x] Error del OS (errorHook).
 12. El OS debe poseer una API que contenga como mínimo las siguientes funciones:
 - [x] Función de retardos (delay).
-- [] Semáforos binarios.
-- [] Colas (queue).
-- [] Secciones críticas.
-- [] Forzado de Scheduling (cpu yield).
+- [ ] Semáforos binarios.
+- [ ] Colas (queue).
+- [ ] Secciones críticas.
+- [ ] Forzado de Scheduling (cpu yield).
