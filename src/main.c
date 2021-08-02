@@ -14,129 +14,166 @@
 
 /* macros --------------------------------------------------------------------*/
 
-#define SYSTICK_TIME	1000	/**< SysTick time in us */
-
 /* typedef -------------------------------------------------------------------*/
 
 /* data declaration ----------------------------------------------------------*/
 
 /* function declaration ------------------------------------------------------*/
 
-static void init(void);
+/* Initializations */
+static void initBoard(void);
+static os_Error_t initTasks(void);
 
+/* Errors */
+static void errorHandler(void);
+
+/* Tasks */
 static void task1(void * arg);
 static void task2(void * arg);
 static void task3(void * arg);
 static void task4(void * arg);
+static void task5(void * arg);
+static void task6(void * arg);
+static void task7(void * arg);
+static void task8(void * arg);
 
 /* main ----------------------------------------------------------------------*/
 
 int main() {
-	init();
+	/* Board initialization */
+	initBoard();
 
 	/* OS initialization */
     os_Init();
 
     /* Tasks initialization */
-    os_Error_t err;
+    if(initTasks() != OS_OK) {
+    	errorHandler();
+    }
 
-    err = os_InitTask(task1, "Task 1", 1, NULL);
-
-	if( err != OS_OK) {
-		os_ErrorHandler(err);
-	}
-
-    err = os_InitTask(task2, "Task 2", 1, NULL);
-
-	if( err != OS_OK) {
-		os_ErrorHandler(err);
-	}
-
-    err = os_InitTask(task3, "Task 3", 1, NULL);
-
-	if( err != OS_OK) {
-		os_ErrorHandler(err);
-	}
-
-    err = os_InitTask(task4, "Task 4", 1, NULL);
-
-	if( err != OS_OK) {
-		os_ErrorHandler(err);
-	}
+    /* Start scheduler */
+	os_StartScheduler();
 
 	/* Infinite loop */
-	for(;;) {
-
-	}
+	for(;;);
 }
-
 /* function definition -------------------------------------------------------*/
 
-static void init(void)  {
+/* Initializations */
+static void initBoard(void) {
 	Board_Init();
 	boardConfig();
-	SystemCoreClockUpdate();
-	SysTick_Config(SystemCoreClock / SYSTICK_TIME);
 }
 
-static void task1(void * arg)  {
-	uint32_t h = 0;
-	uint32_t i = 0;
+static os_Error_t initTasks(void) {
+	os_Error_t err = OS_OK;
 
-	while (1) {
-		h++;
-		i++;
+    err = os_CreateTask(task1, "Task 1", IDLE_TASK_PRIORITY + 4, NULL);
 
-		if(i == 5000000)
-		{
-			gpioToggle(LEDB);
-			i = 0;
-		}
+	if(err != OS_OK) {
+		return OS_FAIL;
+	}
+
+    err = os_CreateTask(task2, "Task 2", IDLE_TASK_PRIORITY + 3, NULL);
+
+	if(err != OS_OK) {
+		return OS_FAIL;
+	}
+
+    err = os_CreateTask(task3, "Task 3", IDLE_TASK_PRIORITY + 2, NULL);
+
+	if(err != OS_OK) {
+		return OS_FAIL;
+	}
+
+    err = os_CreateTask(task4, "Task 4", IDLE_TASK_PRIORITY + 1, NULL);
+
+	if(err != OS_OK) {
+		return OS_FAIL;
+	}
+
+    err = os_CreateTask(task5, "Task 5", IDLE_TASK_PRIORITY + 1, NULL);
+
+	if(err != OS_OK) {
+		return OS_FAIL;
+	}
+
+    err = os_CreateTask(task6, "Task 6", IDLE_TASK_PRIORITY + 1, NULL);
+
+	if(err != OS_OK) {
+		return OS_FAIL;
+	}
+
+    err = os_CreateTask(task7, "Task 7", IDLE_TASK_PRIORITY + 1, NULL);
+
+	if(err != OS_OK) {
+		return OS_FAIL;
+	}
+
+    err = os_CreateTask(task8, "Task 8", IDLE_TASK_PRIORITY + 1, NULL);
+
+	if(err != OS_OK) {
+		return OS_FAIL;
+	}
+
+	return err;
+}
+
+/* Errors */
+static void errorHandler(void) {
+	for(;;);
+}
+
+/* Tasks */
+static void task1(void * arg) {
+	for(;;) {
+		gpioToggle(LEDB);
+		os_TaskDelay(500);
 	}
 }
 
-static void task2(void * arg)  {
-	uint32_t j = 0;
-	uint32_t k = 0;
-
-	while (1) {
-		j++;
-		k++;
-		if(j == 5000000)
-		{
-			gpioToggle(LED1);
-			j = 0;
-		}
+static void task2(void * arg) {
+	for(;;) {
+		gpioToggle(LED1);
+		os_TaskDelay(1000);
 	}
 }
 
-static void task3(void * arg)  {
-	uint32_t l = 0;
-	uint32_t m = 0;
-
-	while (1) {
-		l++;
-		m++;
-		if(l == 5000000)
-		{
-			gpioToggle(LED2);
-			l = 0;
-		}
+static void task3(void * arg) {
+	for(;;) {
+		gpioToggle(LED2);
+		os_TaskDelay(2000);
 	}
 }
 
-static void task4(void * arg)  {
-	uint32_t l = 0;
-	uint32_t m = 0;
+static void task4(void * arg) {
+	for(;;) {
+		gpioToggle(LED3);
+		os_TaskDelay(4000);
+	}
+}
 
-	while (1) {
-		l++;
-		m++;
-		if(l == 5000000)
-		{
-			gpioToggle(LED3);
-			l = 0;
-		}
+static void task5(void * arg) {
+	for(;;) {
+		os_TaskDelay(999);
+	}
+}
+
+static void task6(void * arg) {
+	for(;;) {
+		os_TaskDelay(999);
+	}
+}
+
+static void task7(void * arg) {
+	for(;;) {
+		os_TaskDelay(999);
+	}
+}
+
+static void task8(void * arg) {
+	for(;;) {
+		os_TaskDelay(999);
 	}
 }
 
