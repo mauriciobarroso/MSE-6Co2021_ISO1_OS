@@ -102,19 +102,6 @@ os_Error_t os_StartScheduler(void) {
 	return err;
 }
 
-os_Error_t os_TaskDelay(uint32_t ticks) {
-	os_Error_t err = OS_OK;
-
-	if(ticks > 0) {
-		os.taskCurrent->state = BLOCKED_STATE;
-		os.taskCurrent->ticksBlocked = ticks;
-	}
-
-	os_Yield();
-
-	return err;
-}
-
 os_Error_t os_Yield(void) {
 	os_Error_t err = OS_OK;
 
@@ -127,11 +114,70 @@ os_Error_t os_Yield(void) {
 	return err;
 }
 
+os_Error_t os_TaskDelay(uint32_t ticks) {
+	os_Error_t err = OS_OK;
+
+	if(ticks > 0) {
+		os.taskCurrent->state = BLOCKED_STATE;
+		os.taskCurrent->ticksBlocked = ticks;
+
+		os_Yield();
+	}
+
+
+	return err;
+}
+
+os_Error_t Semaphore_CreateBinary(Semaphore_t * const me) {
+	os_Error_t err = OS_OK;
+
+	me->task = NULL;
+	me->isGiven = false;
+
+	return err;
+}
+
+os_Error_t Semaphore_Take(Semaphore_t * const me) {
+	os_Error_t err = OS_OK;
+
+	me->task = os.taskCurrent;
+
+
+	if(me->isGiven == false) {
+		me->task->state = BLOCKED_STATE;
+		me->task->ticksBlocked = MAX_TIME_DELAY;
+
+		os_Yield();
+	}
+
+	if(me->isGiven == true) {
+		me->isGiven = false;
+	}
+
+	return err;
+}
+
+os_Error_t Semaphore_Give(Semaphore_t * const me) {
+	os_Error_t err = OS_OK;
+
+	me->isGiven = true;
+
+	if(me->task != NULL) {
+		me->task->ticksBlocked = 0;
+	}
+
+//	os_Yield();
+
+	return err;
+}
+
 void SysTick_Handler(void) {
 	/* Decrement ticks blocked in task with BLOCKED_STATE state*/
 	for(size_t i = 0; i < os.tasksNum; i++) {
-		if(os.tasksArray[i].ticksBlocked > 0) {
-			os.tasksArray[i].ticksBlocked--;
+		if(os.tasksArray[i].state == BLOCKED_STATE) {
+			if(os.tasksArray[i].ticksBlocked > 0) {
+				os.tasksArray[i].ticksBlocked--;
+			}
 
 			if(os.tasksArray[i].ticksBlocked == 0) {
 				os.tasksArray[i].state = READY_STATE;

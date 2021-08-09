@@ -18,6 +18,8 @@
 
 /* data declaration ----------------------------------------------------------*/
 
+Semaphore_t semaphore1;
+
 /* function declaration ------------------------------------------------------*/
 
 /* Initializations */
@@ -45,6 +47,9 @@ int main() {
 
 	/* OS initialization */
     os_Init();
+
+    /* Semaphores initialization */
+    Semaphore_CreateBinary(&semaphore1);
 
     /* Tasks initialization */
     if(initTasks() != OS_OK) {
@@ -74,47 +79,47 @@ static os_Error_t initTasks(void) {
 		return OS_FAIL;
 	}
 
-    err = os_CreateTask(task2, "Task 2", IDLE_TASK_PRIORITY + 3, NULL);
+    err = os_CreateTask(task2, "Task 2", IDLE_TASK_PRIORITY + 5, NULL);
 
 	if(err != OS_OK) {
 		return OS_FAIL;
 	}
 
-    err = os_CreateTask(task3, "Task 3", IDLE_TASK_PRIORITY + 2, NULL);
-
-	if(err != OS_OK) {
-		return OS_FAIL;
-	}
-
-    err = os_CreateTask(task4, "Task 4", IDLE_TASK_PRIORITY + 1, NULL);
-
-	if(err != OS_OK) {
-		return OS_FAIL;
-	}
-
-    err = os_CreateTask(task5, "Task 5", IDLE_TASK_PRIORITY + 1, NULL);
-
-	if(err != OS_OK) {
-		return OS_FAIL;
-	}
-
-    err = os_CreateTask(task6, "Task 6", IDLE_TASK_PRIORITY + 1, NULL);
-
-	if(err != OS_OK) {
-		return OS_FAIL;
-	}
-
-    err = os_CreateTask(task7, "Task 7", IDLE_TASK_PRIORITY + 1, NULL);
-
-	if(err != OS_OK) {
-		return OS_FAIL;
-	}
-
-    err = os_CreateTask(task8, "Task 8", IDLE_TASK_PRIORITY + 1, NULL);
-
-	if(err != OS_OK) {
-		return OS_FAIL;
-	}
+//    err = os_CreateTask(task3, "Task 3", IDLE_TASK_PRIORITY + 2, NULL);
+//
+//	if(err != OS_OK) {
+//		return OS_FAIL;
+//	}
+//
+//    err = os_CreateTask(task4, "Task 4", IDLE_TASK_PRIORITY + 1, NULL);
+//
+//	if(err != OS_OK) {
+//		return OS_FAIL;
+//	}
+//
+//    err = os_CreateTask(task5, "Task 5", IDLE_TASK_PRIORITY + 1, NULL);
+//
+//	if(err != OS_OK) {
+//		return OS_FAIL;
+//	}
+//
+//    err = os_CreateTask(task6, "Task 6", IDLE_TASK_PRIORITY + 1, NULL);
+//
+//	if(err != OS_OK) {
+//		return OS_FAIL;
+//	}
+//
+//    err = os_CreateTask(task7, "Task 7", IDLE_TASK_PRIORITY + 1, NULL);
+//
+//	if(err != OS_OK) {
+//		return OS_FAIL;
+//	}
+//
+//    err = os_CreateTask(task8, "Task 8", IDLE_TASK_PRIORITY + 1, NULL);
+//
+//	if(err != OS_OK) {
+//		return OS_FAIL;
+//	}
 
 	return err;
 }
@@ -128,6 +133,7 @@ static void errorHandler(void) {
 static void task1(void * arg) {
 	for(;;) {
 		gpioToggle(LEDB);
+		Semaphore_Give(&semaphore1);
 		os_TaskDelay(500);
 	}
 }
@@ -135,7 +141,7 @@ static void task1(void * arg) {
 static void task2(void * arg) {
 	for(;;) {
 		gpioToggle(LED1);
-		os_TaskDelay(1000);
+		Semaphore_Take(&semaphore1);
 	}
 }
 

@@ -64,6 +64,9 @@ extern "C" {
 #define TASKS_MAX			8	/**< */
 #define TASK_NAME_LEN		16	/**< */
 
+/**/
+#define MAX_TIME_DELAY		0xFFFFFFFF	/**< */
+
 /* typedef -------------------------------------------------------------------*/
 /**
  * @brief Task states.
@@ -121,13 +124,21 @@ typedef struct {
 	os_Task_t * taskNext;								/**< Pointer to the next task to run */
 } os_t;
 
+/**
+ * @brief Semaphore control structure.
+ */
+typedef struct {
+	os_Task_t * task;	/**<  */
+	bool isGiven;		/**<  */
+} Semaphore_t;
+
 /* external data declaration -------------------------------------------------*/
 
 /**
  * @brief OS initialization function.
  * @return none
  */
-os_Error_t os_Init(void);	/* todo: use OOP declaration */
+os_Error_t os_Init(void);
 
 /**
  * @brief OS task creation function.
@@ -138,7 +149,7 @@ os_Error_t os_Init(void);	/* todo: use OOP declaration */
  * @return - OS_OK: successful
  * 		   - OS_FAIL: fail
  */
-os_Error_t os_CreateTask(void * task, const char * name, uint32_t priority, void * arg);	/* todo: use OOP declaration and write descriptions*/
+os_Error_t os_CreateTask(void * task, const char * name, uint32_t priority, void * arg); /* todo: implement task argument */
 
 /**
  * @brief OS task deletion function.
@@ -155,6 +166,13 @@ os_Error_t os_DeleteTask(uint32_t id);	/* todo: implement */
 os_Error_t os_StartScheduler(void);
 
 /**
+ * @brief OS API to force scheduling.
+ * @return - OS_OK: successful
+ * 		   - OS_FAIL: fail
+ */
+os_Error_t os_Yield(void);
+
+/**
  * @brief OS API to delay and block task.
  * @param ticks
  * @return - OS_OK: successful
@@ -163,13 +181,28 @@ os_Error_t os_StartScheduler(void);
 os_Error_t os_TaskDelay(uint32_t ticks);
 
 /**
- * @brief OS API to delay and block task.
- * @param time
+ * @brief OS API to create a binary semaphore.
+ * @param semaphore
  * @return - OS_OK: successful
  * 		   - OS_FAIL: fail
  */
-os_Error_t os_Yield(void);	/* todo: write correctly the description */
+os_Error_t Semaphore_CreateBinary(Semaphore_t * const me);
 
+/**
+ * @brief OS API to take a binary semaphore.
+ * @param semaphore
+ * @return - OS_OK: successful
+ * 		   - OS_FAIL: fail
+ */
+os_Error_t Semaphore_Take(Semaphore_t * const me); /* todo: implement ticks delay */
+
+/**
+ * @brief OS API to give a binary semaphore.
+ * @param semaphore
+ * @return - OS_OK: successful
+ * 		   - OS_FAIL: fail
+ */
+os_Error_t Semaphore_Give(Semaphore_t * const me);
 
 /**
  * @brief Hook de retorno de tareas
