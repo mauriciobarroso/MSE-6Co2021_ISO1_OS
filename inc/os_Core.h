@@ -67,6 +67,9 @@ extern "C" {
 /**/
 #define MAX_TIME_DELAY		0xFFFFFFFF	/**< */
 
+/**/
+#define QUEUE_SIZE_BYTES	64			/**< Queue size in bytes */
+
 /* typedef -------------------------------------------------------------------*/
 /**
  * @brief Task states.
@@ -130,7 +133,29 @@ typedef struct {
 typedef struct {
 	os_Task_t * task;	/**<  */
 	bool isGiven;		/**<  */
-} Semaphore_t;
+} Semaphore_t; /* todo: write element descriptions */
+
+/**
+ * @brief queue states.
+ */
+typedef enum {
+	QUEUE_EMPTY_STATE = 0,	/**< Queue is empty */
+	QUEUE_AVAILABLE_STATE,	/**< Queue has spaces available */
+	QUEUE_FULL_STATE		/**< Queue is full */
+} Queue_State_e;
+
+/**
+ * @brief Queue control structure.
+ */
+typedef struct {
+	uint8_t data[QUEUE_SIZE_BYTES];	/**< Queue data array */
+	size_t size;					/**< Queue data size */
+	size_t len;						/**< Queue length (number of elements) */
+	size_t head;					/**< Queue index head */
+	size_t tail;					/**< Queue index tail */
+	Queue_State_e state;			/**< Queue state */
+	os_Task_t * task;				/**< Task associated to queue */
+} Queue_t;
 
 /* external data declaration -------------------------------------------------*/
 
@@ -181,16 +206,16 @@ os_Error_t os_Yield(void);
 os_Error_t os_TaskDelay(uint32_t ticks);
 
 /**
- * @brief OS API to create a binary semaphore.
- * @param semaphore
+ * @brief OS API to create a semaphore (binary).
+ * @param me
  * @return - OS_OK: successful
  * 		   - OS_FAIL: fail
  */
-os_Error_t Semaphore_CreateBinary(Semaphore_t * const me);
+os_Error_t Semaphore_Init(Semaphore_t * const me);
 
 /**
  * @brief OS API to take a binary semaphore.
- * @param semaphore
+ * @param me
  * @return - OS_OK: successful
  * 		   - OS_FAIL: fail
  */
@@ -198,11 +223,38 @@ os_Error_t Semaphore_Take(Semaphore_t * const me); /* todo: implement ticks dela
 
 /**
  * @brief OS API to give a binary semaphore.
- * @param semaphore
+ * @param me
  * @return - OS_OK: successful
  * 		   - OS_FAIL: fail
  */
 os_Error_t Semaphore_Give(Semaphore_t * const me);
+
+/**
+ * @brief OS API to create a queue.
+ * @param me
+ * @param size
+ * @return - OS_OK: successful
+ * 		   - OS_FAIL: fail
+ */
+os_Error_t Queue_Init(Queue_t * const me, size_t size);
+
+/**
+ * @brief OS API to send/write data into a queue.
+ * @param me
+ * @param data
+ * @return - OS_OK: successful
+ * 		   - OS_FAIL: fail
+ */
+os_Error_t Queue_Send(Queue_t * const me, void * data); /* todo: implement ticks blocked */
+
+/**
+ * @brief OS API to receive/read data from a queue.
+ * @param me
+ * @param data
+ * @return - OS_OK: successful
+ * 		   - OS_FAIL: fail
+ */
+os_Error_t Queue_Receive(Queue_t * const me, void * data); /* todo: implement ticks blocked */
 
 /**
  * @brief Hook de retorno de tareas

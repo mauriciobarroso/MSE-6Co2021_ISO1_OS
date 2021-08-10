@@ -25,6 +25,7 @@ static void scheduler(void);
 static void setPendSV(void);
 static int  comparePriorities(const void * n1vp, const void * n2vp);
 static void sortTaks(os_Task_t * array, size_t n);
+static Queue_State_e queueState(Queue_t * queue);
 
 /* external functions definition ---------------------------------------------*/
 
@@ -128,7 +129,7 @@ os_Error_t os_TaskDelay(uint32_t ticks) {
 	return err;
 }
 
-os_Error_t Semaphore_CreateBinary(Semaphore_t * const me) {
+os_Error_t Semaphore_Init(Semaphore_t * const me) {
 	os_Error_t err = OS_OK;
 
 	me->task = NULL;
@@ -162,11 +163,89 @@ os_Error_t Semaphore_Give(Semaphore_t * const me) {
 
 	me->isGiven = true;
 
+	/* If the task associated to semaphore is a valid pointer, then the
+	 * ticks blocked is reset and the Systick handler will change its state
+	 * to READY_STATE */
 	if(me->task != NULL) {
 		me->task->ticksBlocked = 0;
 	}
 
-//	os_Yield();
+	return err;
+}
+
+os_Error_t Queue_Init(Queue_t * const me, size_t size) {
+	os_Error_t err = OS_OK;
+
+	/* Define the length (number of elements) of th queue */
+	me->size = size;
+	me->len = QUEUE_SIZE_BYTES / me->size;
+
+	/* Indexes initialization. If head equato to tail, then
+	 * the queue is empty */
+	me->head = 0;
+	me->tail = 0;
+
+	/* Initialize the task associated to queue in NULL */
+	me->task = NULL;
+
+	return err;
+}
+
+os_Error_t Queue_Send(Queue_t * const me, void * data) {
+	os_Error_t err = OS_OK;
+
+	/* If the task associated to queue is a valid pointer, then the ticks
+	 * blocked is reset and the Systick handler will change its state to
+	 * READY_STATE */
+	if(me->task != NULL) {
+		me->task->ticksBlocked = 0;
+	}
+
+	/* If queue is full return with error */
+	if(queueState(me) == QUEUE_FULL_STATE) {
+		err = OS_FAIL;
+	}
+	/* If queue is not full, then write data */
+	else {
+		if(memcpy(me->data + me->tail, data, me->size) != NULL) {
+			me->tail += me->size;
+		}
+		else {
+			err = OS_FAIL;
+		}
+	}
+
+	return err;
+}
+
+os_Error_t Queue_Receive(Queue_t * const me, void * data) {
+	os_Error_t err = OS_OK;
+
+	me->task = os.taskCurrent;
+
+	/* If the queue is empty, then block the task */
+	if(queueState(me) == QUEUE_EMPTY_STATE) {
+		me->task->state = BLOCKED_STATE;
+		me->task->ticksBlocked = MAX_TIME_DELAY;
+
+		os_Yield();
+	}
+
+	if(queueState(me) != QUEUE_EMPTY_STATE) {
+		/* Read the first element of the queue */
+		if(memcpy(data, me->data + me->head, me->size) != NULL) {
+			me->head += me->size;
+
+			if(me->head == me->tail) {
+				me->head = 0;
+				me->tail = 0;
+			}
+//			me->tail -= me->size;
+		}
+		else {
+			err = OS_FAIL;
+		}
+	}
 
 	return err;
 }
@@ -347,6 +426,18 @@ static void sortTaks(os_Task_t * array, size_t n) {
 	for(size_t i = 0; i < n; i++) {
 		array[i].id = i;
 	}
+}
+
+static Queue_State_e queueState(Queue_t * queue) {
+	if(queue->tail == queue->head) {
+		return QUEUE_EMPTY_STATE;
+	}
+
+	else if(((queue->tail) / queue->size) - queue->len == 0) {
+		return QUEUE_FULL_STATE;
+	}
+
+	return QUEUE_AVAILABLE_STATE;
 }
 
 /* end of file ---------------------------------------------------------------*/

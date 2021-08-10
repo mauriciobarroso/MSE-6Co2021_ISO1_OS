@@ -16,9 +16,21 @@
 
 /* typedef -------------------------------------------------------------------*/
 
+typedef enum {
+	TASK1,
+	TASK2,
+	TASK3,
+} id_e;
+
+typedef struct {
+	id_e id;
+	int led;
+} app_t;
+
 /* data declaration ----------------------------------------------------------*/
 
 Semaphore_t semaphore1;
+Queue_t queue;
 
 /* function declaration ------------------------------------------------------*/
 
@@ -49,7 +61,10 @@ int main() {
     os_Init();
 
     /* Semaphores initialization */
-    Semaphore_CreateBinary(&semaphore1);
+    Semaphore_Init(&semaphore1);
+
+    /* Queues initialization */
+    Queue_Init(&queue, sizeof(app_t));
 
     /* Tasks initialization */
     if(initTasks() != OS_OK) {
@@ -131,17 +146,31 @@ static void errorHandler(void) {
 
 /* Tasks */
 static void task1(void * arg) {
+	app_t data = {
+			.id = TASK1,
+			.led = LED1,
+	};
+
 	for(;;) {
-		gpioToggle(LEDB);
-		Semaphore_Give(&semaphore1);
+		Queue_Send(&queue, &data);
+
+		data.led++;
+
+		if(data.led == LED3 + 1) {
+			data.led = LED1;
+		}
+
 		os_TaskDelay(500);
 	}
 }
 
 static void task2(void * arg) {
+	app_t data;
+
 	for(;;) {
-		gpioToggle(LED1);
-		Semaphore_Take(&semaphore1);
+		Queue_Receive(&queue, &data);
+
+		gpioToggle(data.led);
 	}
 }
 

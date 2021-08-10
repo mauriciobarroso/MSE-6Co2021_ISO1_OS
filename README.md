@@ -41,7 +41,7 @@ siguientes campos:
 - [x] Error del OS (errorHook).
 12. El OS debe poseer una API que contenga como mínimo las siguientes funciones:
 - [x] Función de retardos (delay).
-- [ ] Semáforos binarios.
-- [ ] Colas (queue).
+- [x] Semáforos binarios.
+- [x] Colas (queue).
 - [ ] Secciones críticas.
-- [ ] Forzado de Scheduling (cpu yield).
+- [x] Forzado de Scheduling (cpu yield).
