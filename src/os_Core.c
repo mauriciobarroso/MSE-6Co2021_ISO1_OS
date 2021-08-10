@@ -353,32 +353,40 @@ static void scheduler(void) {
 		os.taskNext = os.taskCurrent;
 		os.doScheduling = true;
 	}
-	/* If not, search for the task with state RUNNING_STATE in taskArray
-	 * and set the next task with READ_STATE state as taskNext */
+	/* todo: refactor and write comments */
 	else {
-		uint8_t index = os.taskCurrent->id + 1;
+		uint8_t index = 0;
 		uint8_t count = os.tasksNum;
 
-		/* Search in tasks array for the next task with READY_STATE state */
 		while(count > 0) {
-			/* If index is the last task in the array, then reset index */
-			if(index >= os.tasksNum) {
-				index = 0;
-			}
-
-			/* If the task in the array is in READY_STATE state and its priority is greater than the current
-			 *  task, then this will be the next task. If the current task is in BLOCKED_STATE state, then
-			 * the priority is ignored */
-			if(os.tasksArray[index].state == READY_STATE) {
-				if(os.tasksArray[index].priority >= os.taskCurrent->priority) {
-					os.taskNext = &os.tasksArray[index];
-					os.doScheduling = true;
-					break;
+			if(index <= os.taskCurrent->id) {
+				if(os.tasksArray[index].state == READY_STATE) {
+					if(os.tasksArray[index].priority > os.taskCurrent->priority) {
+						os.taskNext = &os.tasksArray[index];
+						os.doScheduling = true;
+						break;
+					}
+					else {
+						if(os.taskCurrent->priority > os.tasksArray[os.taskCurrent->id + 1].priority) {
+							os.taskNext = &os.tasksArray[index];
+							os.doScheduling = true;
+							break;
+						}
+					}
 				}
-				else if(os.taskCurrent->state == BLOCKED_STATE) {
-					os.taskNext = &os.tasksArray[index];
-					os.doScheduling = true;
-					break;
+			}
+			else {
+				if(os.tasksArray[index].state == READY_STATE) {
+					if(os.tasksArray[index].priority == os.taskCurrent->priority) {
+						os.taskNext = &os.tasksArray[index];
+						os.doScheduling = true;
+						break;
+					}
+					else if(os.taskCurrent->state == BLOCKED_STATE) {
+						os.taskNext = &os.tasksArray[index];
+						os.doScheduling = true;
+						break;
+					}
 				}
 			}
 
