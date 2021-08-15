@@ -125,6 +125,7 @@ typedef struct {
 	bool doScheduling;									/**< Flag to do the schduling proccess */
 	os_Task_t * taskCurrent;							/**< Pointer to the current task running */
 	os_Task_t * taskNext;								/**< Pointer to the next task to run */
+	uint16_t criticalCounter;								/**< Critical section counter */
 } os_t;
 
 /**
@@ -198,12 +199,27 @@ os_Error_t os_StartScheduler(void);
 os_Error_t os_Yield(void);
 
 /**
+ * @brief OS API to enter critical sections.
+ * @return - OS_OK: successful
+ * 		   - OS_FAIL: fail
+ */
+os_Error_t os_EnterCritical(void);
+
+/**
+ * @brief OS API to exit critical sections.
+ * @return - OS_OK: successful
+ * 		   - OS_FAIL: fail
+ */
+os_Error_t os_ExitCritical(void);
+
+/**
  * @brief OS API to delay and block task.
  * @param ticks
  * @return - OS_OK: successful
  * 		   - OS_FAIL: fail
  */
 os_Error_t os_TaskDelay(uint32_t ticks);
+
 
 /**
  * @brief OS API to create a semaphore (binary).

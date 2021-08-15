@@ -115,6 +115,26 @@ os_Error_t os_Yield(void) {
 	return err;
 }
 
+os_Error_t os_EnterCritical(void) {
+	os_Error_t err = OS_OK;
+
+	__disable_irq();
+	os.criticalCounter++;
+
+	return err;
+}
+
+os_Error_t os_ExitCritical(void) {
+	os_Error_t err = OS_OK;
+
+	if(os.criticalCounter <= 0) {
+		os.criticalCounter = 0;
+		__enable_irq();
+	}
+
+	return err;
+}
+
 os_Error_t os_TaskDelay(uint32_t ticks) {
 	os_Error_t err = OS_OK;
 
