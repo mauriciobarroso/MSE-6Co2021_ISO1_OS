@@ -17,7 +17,11 @@
 
 /* external data declaration -------------------------------------------------*/
 
+/* OS parameters instance */
 static os_t os;
+
+/* ISR handlers array */
+static ISR_t isrHandler[IRQ_NUM];
 
 /* internal functions declaration --------------------------------------------*/
 
@@ -26,14 +30,17 @@ static void setPendSV(void);
 static int  comparePriorities(const void * n1vp, const void * n2vp);
 static void sortTaks(os_Task_t * array, size_t n);
 static Queue_State_e queueState(Queue_t * queue);
+static void IRQHandler(LPC43XX_IRQn_Type IRQn);
 
 /* external functions definition ---------------------------------------------*/
 
 os_Error_t os_Init(void) {
 	os_Error_t err = OS_OK;
 
+	/* Set PendSV priority as the lowest */
 	NVIC_SetPriority(PendSV_IRQn, (1 << __NVIC_PRIO_BITS) - 1);
 
+	/* Initialize os parameters */
 	os.state = FROM_RESET_STATE;
 	os.taskCurrent = NULL;
 	os.taskNext = NULL;
@@ -41,17 +48,18 @@ os_Error_t os_Init(void) {
 
 	/* Idle task initialization */
 	os.taskIdle.stack = os.taskIdleStack;
-
 	os.taskIdle.stack[STACK_SIZE_WORDS - XPSR_REG_POS] = INIT_XPSR;
 	os.taskIdle.stack[STACK_SIZE_WORDS - PC_REG_POS] = (uint32_t)idleTask;
 	os.taskIdle.stack[STACK_SIZE_WORDS - LR_REG_POS] = (uint32_t)returnHook;
 	os.taskIdle.stack[STACK_SIZE_WORDS - LR_PREV_REG_POS] = EXC_RETURN;
-
 	os.taskIdle.sp = (uint32_t)(os.taskIdle.stack + STACK_SIZE_WORDS - FULL_STACKING_SIZE);
 	os.taskIdle.entryPoint = idleTask;
 	os.taskIdle.priority = IDLE_TASK_PRIORITY;
 	os.taskIdle.id = 0xFF;
 	os.taskIdle.state = READY_STATE;
+
+	/* Initialize tick counter */
+	os.tickCounter = 0;
 
 	return err;
 }
@@ -60,6 +68,7 @@ os_Error_t os_Init(void) {
 os_Error_t os_CreateTask(void * task, const char * name, uint32_t priority, void * arg) {
 	os_Error_t err = OS_OK;
 
+	/* If there are space available, then store and init the task */
 	if(os.tasksNum < TASKS_MAX) {
 		os.tasksArray[os.tasksNum].stack = os.tasksStack[os.tasksNum];
 
@@ -135,6 +144,44 @@ os_Error_t os_ExitCritical(void) {
 	return err;
 }
 
+os_Error_t os_InstallIRQ(LPC43XX_IRQn_Type irq, void * isr, void * arg) {
+	os_Error_t err = OS_OK;
+
+	/* Return with error if isr is null */
+	if(isr == NULL) {
+		return OS_FAIL;
+	}
+
+	/* Return with error if the isr handler is already installed */
+	if(isrHandler[irq].handler == isr) {
+		return OS_FAIL;
+	}
+
+	/* Register the isr in the isr handler */
+	isrHandler[irq].handler = isr;
+	isrHandler[irq].arg = arg;
+	NVIC_ClearPendingIRQ(irq);
+	NVIC_EnableIRQ(irq);
+
+	return err;
+}
+
+os_Error_t os_UninstallIRQ(LPC43XX_IRQn_Type irq) {
+	os_Error_t err = OS_OK;
+
+	/* Return with error if the isr handler is not installed */
+	if(isrHandler[irq].handler == NULL) {
+		return OS_FAIL;
+	}
+
+	/* Unregister the isr handler */
+	isrHandler[irq].handler = NULL;
+	NVIC_ClearPendingIRQ(irq);
+	NVIC_DisableIRQ(irq);
+
+	return err;
+}
+
 os_Error_t os_TaskDelay(uint32_t ticks) {
 	os_Error_t err = OS_OK;
 
@@ -145,6 +192,13 @@ os_Error_t os_TaskDelay(uint32_t ticks) {
 		os_Yield();
 	}
 
+	return err;
+}
+
+os_Error_t os_GetTickCounter(uint32_t * ticks) {
+	os_Error_t err = OS_OK;
+
+	* ticks = os.tickCounter;
 
 	return err;
 }
@@ -238,17 +292,18 @@ os_Error_t Queue_Send(Queue_t * const me, void * data) {
 	return err;
 }
 
-os_Error_t Queue_Receive(Queue_t * const me, void * data) {
+os_Error_t Queue_Receive(Queue_t * const me, void * data, uint32_t ticks) {
 	os_Error_t err = OS_OK;
 
 	me->task = os.taskCurrent;
 
 	/* If the queue is empty, then block the task */
 	if(queueState(me) == QUEUE_EMPTY_STATE) {
-		me->task->state = BLOCKED_STATE;
-		me->task->ticksBlocked = MAX_TIME_DELAY;
-
-		os_Yield();
+		if(ticks > 0) {
+			me->task->state = BLOCKED_STATE;
+			me->task->ticksBlocked = ticks;
+			os_Yield();
+		}
 	}
 
 	if(queueState(me) != QUEUE_EMPTY_STATE) {
@@ -271,6 +326,9 @@ os_Error_t Queue_Receive(Queue_t * const me, void * data) {
 }
 
 void SysTick_Handler(void) {
+	/* Increment tick counter */
+	os.tickCounter++;
+
 	/* Decrement ticks blocked in task with BLOCKED_STATE state*/
 	for(size_t i = 0; i < os.tasksNum; i++) {
 		if(os.tasksArray[i].state == BLOCKED_STATE) {
@@ -373,11 +431,14 @@ static void scheduler(void) {
 		os.taskNext = os.taskCurrent;
 		os.doScheduling = true;
 	}
-	/* todo: refactor and write comments */
+	/* If is not the first time the OS run, then select the next task
+	 * from the tasks array */
 	else {
 		uint8_t index = 0;
 		uint8_t count = os.tasksNum;
 
+		/* While the count of tasks is not 0, find the next task according
+		 * the position in the tasks array, state and the priority */
 		while(count > 0) {
 			if(index <= os.taskCurrent->id) {
 				if(os.tasksArray[index].state == READY_STATE) {
@@ -451,6 +512,7 @@ static int  comparePriorities(const void * n1vp, const void * n2vp) {
 static void sortTaks(os_Task_t * array, size_t n) {
 	qsort(array, n, sizeof(os_Task_t), comparePriorities);
 
+	/* Re assign the IDs */
 	for(size_t i = 0; i < n; i++) {
 		array[i].id = i;
 	}
@@ -467,5 +529,71 @@ static Queue_State_e queueState(Queue_t * queue) {
 
 	return QUEUE_AVAILABLE_STATE;
 }
+
+static void IRQHandler(LPC43XX_IRQn_Type IRQn) {
+	os_State_e previousState = os.state;
+	void (* handler)(void *) = isrHandler[IRQn].handler;
+	void * arg = (void *)isrHandler[IRQn].arg;
+
+	os.state = IRQ_RUN_STATE;
+
+	handler(arg);
+
+	os.state = previousState;
+
+	NVIC_ClearPendingIRQ(IRQn);
+}
+
+/* Interrupt service routines */
+void DAC_IRQHandler(void){IRQHandler(         DAC_IRQn         );}
+void M0APP_IRQHandler(void){IRQHandler(       M0APP_IRQn       );}
+void DMA_IRQHandler(void){IRQHandler(         DMA_IRQn         );}
+void FLASH_EEPROM_IRQHandler(void){IRQHandler(RESERVED1_IRQn   );}
+void ETH_IRQHandler(void){IRQHandler(         ETHERNET_IRQn    );}
+void SDIO_IRQHandler(void){IRQHandler(        SDIO_IRQn        );}
+void LCD_IRQHandler(void){IRQHandler(         LCD_IRQn         );}
+void USB0_IRQHandler(void){IRQHandler(        USB0_IRQn        );}
+void USB1_IRQHandler(void){IRQHandler(        USB1_IRQn        );}
+void SCT_IRQHandler(void){IRQHandler(         SCT_IRQn         );}
+void RIT_IRQHandler(void){IRQHandler(         RITIMER_IRQn     );}
+void TIMER0_IRQHandler(void){IRQHandler(      TIMER0_IRQn      );}
+void TIMER1_IRQHandler(void){IRQHandler(      TIMER1_IRQn      );}
+void TIMER2_IRQHandler(void){IRQHandler(      TIMER2_IRQn      );}
+void TIMER3_IRQHandler(void){IRQHandler(      TIMER3_IRQn      );}
+void MCPWM_IRQHandler(void){IRQHandler(       MCPWM_IRQn       );}
+void ADC0_IRQHandler(void){IRQHandler(        ADC0_IRQn        );}
+void I2C0_IRQHandler(void){IRQHandler(        I2C0_IRQn        );}
+void SPI_IRQHandler(void){IRQHandler(         I2C1_IRQn        );}
+void I2C1_IRQHandler(void){IRQHandler(        SPI_INT_IRQn     );}
+void ADC1_IRQHandler(void){IRQHandler(        ADC1_IRQn        );}
+void SSP0_IRQHandler(void){IRQHandler(        SSP0_IRQn        );}
+void SSP1_IRQHandler(void){IRQHandler(        SSP1_IRQn        );}
+void UART0_IRQHandler(void){IRQHandler(       USART0_IRQn      );}
+void UART1_IRQHandler(void){IRQHandler(       UART1_IRQn       );}
+void UART2_IRQHandler(void){IRQHandler(       USART2_IRQn      );}
+void UART3_IRQHandler(void){IRQHandler(       USART3_IRQn      );}
+void I2S0_IRQHandler(void){IRQHandler(        I2S0_IRQn        );}
+void I2S1_IRQHandler(void){IRQHandler(        I2S1_IRQn        );}
+void SPIFI_IRQHandler(void){IRQHandler(       RESERVED4_IRQn   );}
+void SGPIO_IRQHandler(void){IRQHandler(       SGPIO_INT_IRQn   );}
+void GPIO0_IRQHandler(void){IRQHandler(       PIN_INT0_IRQn    );}
+void GPIO1_IRQHandler(void){IRQHandler(       PIN_INT1_IRQn    );}
+void GPIO2_IRQHandler(void){IRQHandler(       PIN_INT2_IRQn    );}
+void GPIO3_IRQHandler(void){IRQHandler(       PIN_INT3_IRQn    );}
+void GPIO4_IRQHandler(void){IRQHandler(       PIN_INT4_IRQn    );}
+void GPIO5_IRQHandler(void){IRQHandler(       PIN_INT5_IRQn    );}
+void GPIO6_IRQHandler(void){IRQHandler(       PIN_INT6_IRQn    );}
+void GPIO7_IRQHandler(void){IRQHandler(       PIN_INT7_IRQn    );}
+void GINT0_IRQHandler(void){IRQHandler(       GINT0_IRQn       );}
+void GINT1_IRQHandler(void){IRQHandler(       GINT1_IRQn       );}
+void EVRT_IRQHandler(void){IRQHandler(        EVENTROUTER_IRQn );}
+void CAN1_IRQHandler(void){IRQHandler(        C_CAN1_IRQn      );}
+void ADCHS_IRQHandler(void){IRQHandler(       ADCHS_IRQn       );}
+void ATIMER_IRQHandler(void){IRQHandler(      ATIMER_IRQn      );}
+void RTC_IRQHandler(void){IRQHandler(         RTC_IRQn         );}
+void WDT_IRQHandler(void){IRQHandler(         WWDT_IRQn        );}
+void M0SUB_IRQHandler(void){IRQHandler(       M0SUB_IRQn       );}
+void CAN0_IRQHandler(void){IRQHandler(        C_CAN0_IRQn      );}
+void QEI_IRQHandler(void){IRQHandler(         QEI_IRQn         );}
 
 /* end of file ---------------------------------------------------------------*/

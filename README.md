@@ -7,7 +7,7 @@ TP para la materia Implementación de Sistemas Operativos I de la Maestría en S
 entendiéndose por este término que la totalidad de memoria asociada a cada tarea y al
 kernel será definida en tiempo de compilación.
 2. [x] La cantidad de tareas que soportara el OS será ocho (8).
-3. [ ] El OS debe administrar las IRQ del hardware.
+3. [x] El OS debe administrar las IRQ del hardware.
 4. El kernel debe poseer una estructura de control la cual contenga como mínimo los
 siguientes campos:
 - [x] Último error ocurrido.
@@ -43,5 +43,5 @@ siguientes campos:
 - [x] Función de retardos (delay).
 - [x] Semáforos binarios.
 - [x] Colas (queue).
-- [ ] Secciones críticas.
+- [x] Secciones críticas.
 - [x] Forzado de Scheduling (cpu yield).

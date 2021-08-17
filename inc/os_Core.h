@@ -10,7 +10,6 @@
 
 /* inclusions ----------------------------------------------------------------*/
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "board.h"
@@ -31,7 +30,7 @@ extern "C" {
 #define SYSTICK_TIME		1000	/**< SysTick time in us */
 
 /**/
-#define STACK_SIZE_BYTES	256					/**< Stack frame size in bytes */
+#define STACK_SIZE_BYTES	512					/**< Stack frame size in bytes */
 #define STACK_SIZE_WORDS	(STACK_SIZE_BYTES \
 							/ sizeof(uint32_t))	/**< Stack frame size in words */
 
@@ -59,16 +58,19 @@ extern "C" {
 #define EXC_RETURN			0xFFFFFFF9	/**< EXC_RETURN value to return to thread mode, no FPU */
 
 /**/
-#define STACK_FRAME_SIZE	8	/**< */
-#define FULL_STACKING_SIZE	17	/**< */
-#define TASKS_MAX			8	/**< */
-#define TASK_NAME_LEN		16	/**< */
+#define STACK_FRAME_SIZE	8	/**< Stack frame size */
+#define FULL_STACKING_SIZE	17	/**< Full stack frame size */
+#define TASKS_MAX			8	/**< Max number of tasks */
+#define TASK_NAME_LEN		16	/**< Length of tasks names*/
 
 /**/
-#define MAX_TIME_DELAY		0xFFFFFFFF	/**< */
+#define MAX_TIME_DELAY		0xFFFFFFFF	/**< Max delay time */
 
 /**/
 #define QUEUE_SIZE_BYTES	64			/**< Queue size in bytes */
+
+/**/
+#define IRQ_NUM				53			/**< IRQ available number */
 
 /* typedef -------------------------------------------------------------------*/
 /**
@@ -87,6 +89,7 @@ typedef enum {
 typedef enum {
 	FROM_RESET_STATE = 0,	/**< OS is coming from a HW reset */
 	NORMAL_RUN_STATE,		/**< OS is running normally */
+	IRQ_RUN_STATE,		/**< OS is running normally */
 } os_State_e;
 
 /**
@@ -125,16 +128,17 @@ typedef struct {
 	bool doScheduling;									/**< Flag to do the schduling proccess */
 	os_Task_t * taskCurrent;							/**< Pointer to the current task running */
 	os_Task_t * taskNext;								/**< Pointer to the next task to run */
-	uint16_t criticalCounter;								/**< Critical section counter */
+	uint16_t criticalCounter;							/**< Critical section counter */
+	uint32_t tickCounter;								/**< OS tick counter */
 } os_t;
 
 /**
  * @brief Semaphore control structure.
  */
 typedef struct {
-	os_Task_t * task;	/**<  */
-	bool isGiven;		/**<  */
-} Semaphore_t; /* todo: write element descriptions */
+	os_Task_t * task;	/**< Task associated to semaphore */
+	bool isGiven;		/**< Variable to detemrine if task is given */
+} Semaphore_t;
 
 /**
  * @brief queue states.
@@ -158,7 +162,17 @@ typedef struct {
 	os_Task_t * task;				/**< Task associated to queue */
 } Queue_t;
 
+/**
+ * @brief Queue control structure.
+ */
+typedef struct {
+	void (* handler)(void *);	/**< ISR handler */
+	void * arg;					/**< ISR handler argument */
+} ISR_t;
+
 /* external data declaration -------------------------------------------------*/
+
+/* OS API */
 
 /**
  * @brief OS initialization function.
@@ -175,7 +189,7 @@ os_Error_t os_Init(void);
  * @return - OS_OK: successful
  * 		   - OS_FAIL: fail
  */
-os_Error_t os_CreateTask(void * task, const char * name, uint32_t priority, void * arg); /* todo: implement task argument */
+os_Error_t os_CreateTask(void * task, const char * name, uint32_t priority, void * arg);
 
 /**
  * @brief OS task deletion function.
@@ -213,6 +227,24 @@ os_Error_t os_EnterCritical(void);
 os_Error_t os_ExitCritical(void);
 
 /**
+ * @brief OS API to install an IRQ services.
+ * @param irq
+ * @param isr
+ * @param arg
+ * @return - OS_OK: successful
+ * 		   - OS_FAIL: fail
+ */
+os_Error_t os_InstallIRQ(LPC43XX_IRQn_Type irq, void * isr, void * arg);
+
+/**
+ * @brief OS API to exit critical sections.
+ * @param irq
+ * @return - OS_OK: successful
+ * 		   - OS_FAIL: fail
+ */
+os_Error_t os_UninstallIRQ(LPC43XX_IRQn_Type irq);
+
+/**
  * @brief OS API to delay and block task.
  * @param ticks
  * @return - OS_OK: successful
@@ -220,6 +252,15 @@ os_Error_t os_ExitCritical(void);
  */
 os_Error_t os_TaskDelay(uint32_t ticks);
 
+/**
+ * @brief OS API to delay and block task.
+ * @param ticks
+ * @return - OS_OK: successful
+ * 		   - OS_FAIL: fail
+ */
+os_Error_t os_GetTickCounter(uint32_t * ticks);
+
+/* Synchronization API */
 
 /**
  * @brief OS API to create a semaphore (binary).
@@ -235,7 +276,7 @@ os_Error_t Semaphore_Init(Semaphore_t * const me);
  * @return - OS_OK: successful
  * 		   - OS_FAIL: fail
  */
-os_Error_t Semaphore_Take(Semaphore_t * const me); /* todo: implement ticks delay */
+os_Error_t Semaphore_Take(Semaphore_t * const me);
 
 /**
  * @brief OS API to give a binary semaphore.
@@ -261,16 +302,17 @@ os_Error_t Queue_Init(Queue_t * const me, size_t size);
  * @return - OS_OK: successful
  * 		   - OS_FAIL: fail
  */
-os_Error_t Queue_Send(Queue_t * const me, void * data); /* todo: implement ticks blocked */
+os_Error_t Queue_Send(Queue_t * const me, void * data);
 
 /**
  * @brief OS API to receive/read data from a queue.
  * @param me
  * @param data
+ * @param ticks
  * @return - OS_OK: successful
  * 		   - OS_FAIL: fail
  */
-os_Error_t Queue_Receive(Queue_t * const me, void * data); /* todo: implement ticks blocked */
+os_Error_t Queue_Receive(Queue_t * const me, void * data, uint32_t ticks);
 
 /**
  * @brief Hook de retorno de tareas
